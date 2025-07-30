@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://drorodrigosguario.netlify.app/sitemap.xml
+
+# Disallow admin area
+Disallow: /admin/
+
+# Allow important pages
+Allow: /
+Allow: /blog/
+Allow: /sobre/
+Allow: /servicos/
+Allow: /contato/
+
+# Crawl-delay
+Crawl-delay: 1
+
