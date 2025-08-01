@@ -16,10 +16,10 @@ from src.routes.settings import settings_bp
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dr-rodrigo-secret-key-2025')
 
-# Configurar CORS para permitir requisições de qualquer origem (necessário para deploy separado)
+# Configurar CORS para permitir requisições do frontend no Netlify
 CORS(app, 
      supports_credentials=True,
-     origins=["*"],  # Permite qualquer origem
+     origins=["https://sitecardiologia.netlify.app"], # <-- AQUI ESTÁ A CORREÇÃO
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
