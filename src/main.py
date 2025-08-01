@@ -68,6 +68,7 @@ def health_check():
         "database": "connected",
         "platform": "Render",
         "timestamp": "2025-07-30"
+        "version": "2.0-cors-test"
     })
 
 if __name__ == '__main__':
