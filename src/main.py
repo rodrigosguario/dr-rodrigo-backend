@@ -67,7 +67,7 @@ def health_check():
         "status": "healthy",
         "database": "connected",
         "platform": "Render",
-        "timestamp": "2025-07-30"
+        "timestamp": "2025-07-30", # <-- A VÍRGULA QUE FALTAVA FOI ADICIONADA AQUI
         "version": "2.0-cors-test"
     })
 
