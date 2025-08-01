@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, jsonify
-from flask_cors import CORS
+# from flask_cors import CORS <-- REMOVIDO
 from src.models.user import db
 from src.models.admin import Admin
 from src.models.blog import BlogPost, BlogCategory
@@ -16,12 +16,7 @@ from src.routes.settings import settings_bp
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dr-rodrigo-secret-key-2025')
 
-# Configurar CORS para permitir requisições do frontend no Netlify
-CORS(app, 
-     supports_credentials=True,
-     origins=["https://sitecardiologia.netlify.app"], # <-- AQUI ESTÁ A CORREÇÃO
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+# Bloco de código CORS foi removido daqui
 
 # Registrar blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
@@ -78,4 +73,3 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-

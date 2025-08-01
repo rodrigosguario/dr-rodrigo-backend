@@ -1,11 +1,26 @@
+import os
+import sys
+# DON'T CHANGE THIS !!!
+# O código original não tinha essa parte, mas mantive das outras versões para consistência
+# sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import check_password_hash
 from src.models.admin import Admin, db
 from src.models.blog import BlogPost, BlogCategory
 from datetime import datetime
 import functools
+from flask_cors import CORS # NOVO: Importa a biblioteca CORS
 
 admin_bp = Blueprint('admin', __name__)
+
+# NOVO: Aplica a configuração de CORS diretamente neste blueprint
+CORS(admin_bp,
+     supports_credentials=True,
+     origins=["https://sitecardiologia.netlify.app"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 
 def login_required(f):
     """Decorator para verificar se o usuário está logado"""
@@ -161,12 +176,12 @@ def get_dashboard_stats():
         
         # Posts mais visualizados
         popular_posts = BlogPost.query.filter_by(is_published=True)\
-                                    .order_by(BlogPost.views.desc())\
-                                    .limit(5).all()
+                                      .order_by(BlogPost.views.desc())\
+                                      .limit(5).all()
         
         # Posts recentes
         recent_posts = BlogPost.query.order_by(BlogPost.created_at.desc())\
-                                   .limit(5).all()
+                                     .limit(5).all()
         
         # Total de visualizações
         total_views = db.session.query(db.func.sum(BlogPost.views)).scalar() or 0
@@ -206,4 +221,3 @@ def check_auth():
         
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-
