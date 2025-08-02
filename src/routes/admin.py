@@ -1,26 +1,11 @@
-import os
-import sys
-# DON'T CHANGE THIS !!!
-# O código original não tinha essa parte, mas mantive das outras versões para consistência
-# sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import check_password_hash
 from src.models.admin import Admin, db
 from src.models.blog import BlogPost, BlogCategory
 from datetime import datetime
 import functools
-from flask_cors import CORS # NOVO: Importa a biblioteca CORS
 
 admin_bp = Blueprint('admin', __name__)
-
-# NOVO: Aplica a configuração de CORS diretamente neste blueprint
-CORS(admin_bp,
-     supports_credentials=True,
-     origins=["https://sitecardiologia.netlify.app"],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-
 
 def login_required(f):
     """Decorator para verificar se o usuário está logado"""
@@ -180,44 +165,4 @@ def get_dashboard_stats():
                                       .limit(5).all()
         
         # Posts recentes
-        recent_posts = BlogPost.query.order_by(BlogPost.created_at.desc())\
-                                     .limit(5).all()
-        
-        # Total de visualizações
-        total_views = db.session.query(db.func.sum(BlogPost.views)).scalar() or 0
-        
-        stats = {
-            'blog': {
-                'total_posts': total_posts,
-                'published_posts': published_posts,
-                'draft_posts': draft_posts,
-                'total_views': total_views
-            },
-            'popular_posts': [post.to_dict() for post in popular_posts],
-            'recent_posts': [post.to_dict() for post in recent_posts]
-        }
-        
-        return jsonify(stats), 200
-        
-    except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-
-@admin_bp.route('/check-auth', methods=['GET'])
-def check_auth():
-    """Verifica se o usuário está autenticado"""
-    try:
-        if 'admin_id' not in session:
-            return jsonify({'authenticated': False}), 200
-        
-        admin = Admin.query.get(session['admin_id'])
-        if not admin or not admin.is_active:
-            session.clear()
-            return jsonify({'authenticated': False}), 200
-        
-        return jsonify({
-            'authenticated': True,
-            'admin': admin.to_dict()
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+        recent_posts = BlogPost.query.order_by(BlogPost 
