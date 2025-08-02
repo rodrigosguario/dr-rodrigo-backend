@@ -165,4 +165,24 @@ def get_dashboard_stats():
                                       .limit(5).all()
         
         # Posts recentes
-        recent_posts = BlogPost.query.order_by(BlogPost 
+        recent_posts = BlogPost.query.order_by(BlogPost.created_at.desc())\
+                                     .limit(5).all()
+        
+        # Total de visualizações
+        total_views = db.session.query(db.func.sum(BlogPost.views)).scalar() or 0
+        
+        stats = {
+            'blog': {
+                'total_posts': total_posts,
+                'published_posts': published_posts,
+                'draft_posts': draft_posts,
+                'total_views': total_views
+            },
+            'popular_posts': [post.to_dict() for post in popular_posts],
+            'recent_posts': [post.to_dict() for post in recent_posts]
+        }
+        
+        return jsonify(stats), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
