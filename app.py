@@ -23,9 +23,6 @@ def login():
     try:
         data = request.get_json()
         
-        # --- CORREÇÃO FINAL ---
-        # Alterado de data.get('email') para data.get('username')
-        # para corresponder ao que o frontend envia.
         username = data.get('username')
         password = data.get('password')
 
@@ -39,6 +36,24 @@ def login():
             return jsonify({"success": False, "error": "Credenciais inválidas"}), 401
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+# --- ROTA DE VERIFICAÇÃO DE AUTENTICAÇÃO (ADICIONADA DE VOLTA) ---
+@app.route('/api/admin/check-auth', methods=['GET', 'OPTIONS'])
+def check_auth():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    # Para este teste, vamos assumir que qualquer pedido com um token é válido.
+    # O seu frontend envia um cabeçalho 'Authorization'.
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith("Bearer "):
+        return jsonify({
+            "authenticated": True,
+            "user": { "email": "admin@example.com", "name": "Dr. Rodrigo Sguario" }
+        })
+    else:
+        # Se não houver token, não está autenticado
+        return jsonify({"authenticated": False}), 401
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
