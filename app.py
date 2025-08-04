@@ -6,15 +6,10 @@ import os
 # 1. INICIALIZAÇÃO DO FLASK
 app = Flask(__name__)
 
-# 2. CONFIGURAÇÃO DE CORS (ESSENCIAL PARA O SEU FRONTEND)
-# Permite que seu site em 'netlify.app' se comunique com este backend.
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["https://sitecardiologia.netlify.app", "http://localhost:5173"], # Adicionado localhost para testes locais
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
+# 2. CONFIGURAÇÃO DE CORS (SIMPLIFICADA PARA TESTE DEFINITIVO)
+# Esta é a configuração mais simples possível. Ela permite que QUALQUER site
+# aceda à sua API. Se isto não funcionar, o problema não é o CORS.
+CORS(app)
 
 # 3. ROTA DE VERIFICAÇÃO DA API
 # Ótima para um teste rápido e ver se o backend está no ar.
