@@ -58,11 +58,12 @@ def login():
         return '', 204
     try:
         data = request.get_json()
-        # Corrigido para 'email' para corresponder ao que o frontend envia
-        email = data.get('email')
+        # --- CORREÇÃO APLICADA AQUI ---
+        # Revertido para 'username' como estava no seu código original que funcionava.
+        username = data.get('username')
         password = data.get('password')
 
-        if email == 'admin@example.com' and password == 'admin123':
+        if username == 'admin@example.com' and password == 'admin123':
             return jsonify({
                 "success": True, 
                 "token": "fake-jwt-token-for-login",
@@ -83,6 +84,15 @@ def check_auth():
         "authenticated": True,
         "user": { "email": "admin@example.com", "name": "Dr. Rodrigo Sguario" }
     })
+
+# --- ROTA ADICIONADA PARA EVITAR ERRO 404 ---
+@app.route('/api/settings/colors', methods=['GET', 'OPTIONS'])
+def get_colors():
+    if request.method == 'OPTIONS':
+        return '', 204
+    # Devolve uma resposta padrão para o painel não dar erro.
+    return jsonify([]), 200
+
 
 # --- NOVA ROTA PARA SALVAR POSTS ---
 @app.route('/api/posts', methods=['POST', 'OPTIONS'])
