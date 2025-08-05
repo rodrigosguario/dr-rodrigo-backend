@@ -9,10 +9,8 @@ app = Flask(__name__)
 CORS(app)
 
 # --- FUNÇÕES DO BANCO DE DADOS ---
-# Adicionadas para gerir a ligação e criar a tabela de posts
 def get_db_connection():
     try:
-        # Usa a variável de ambiente que configurámos no Render
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         return conn
     except Exception as e:
@@ -23,7 +21,6 @@ def inicializar_db():
     conn = get_db_connection()
     if conn:
         with conn.cursor() as cur:
-            # Cria a tabela 'posts' se ela ainda não existir
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
                     id SERIAL PRIMARY KEY,
@@ -41,25 +38,20 @@ def inicializar_db():
 
 # --- ROTAS DA API ---
 
-# Rota principal para verificar se a API está no ar
 @app.route('/')
 def home():
     return jsonify({"message": "API Backend funcionando!"})
 
-# Rota de verificação de saúde para o Render
 @app.route('/health')
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-# Rota de login (a sua versão que já funcionava)
 @app.route('/api/admin/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
         return '', 204
     try:
         data = request.get_json()
-        # --- CORREÇÃO APLICADA AQUI ---
-        # Revertido para 'username' como estava no seu código original que funcionava.
         username = data.get('username')
         password = data.get('password')
 
@@ -74,28 +66,26 @@ def login():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# Rota de verificação de autenticação (a sua versão que já funcionava)
 @app.route('/api/admin/check-auth', methods=['GET', 'OPTIONS'])
 def check_auth():
     if request.method == 'OPTIONS':
         return '', 204
-    
     return jsonify({
         "authenticated": True,
         "user": { "email": "admin@example.com", "name": "Dr. Rodrigo Sguario" }
     })
 
-# --- ROTA ADICIONADA PARA EVITAR ERRO 404 ---
-@app.route('/api/settings/colors', methods=['GET', 'OPTIONS'])
-def get_colors():
+# --- ROTAS ADICIONADAS PARA EVITAR ERROS 404 ---
+@app.route('/api/settings/<path:subpath>', methods=['GET', 'OPTIONS'])
+def get_settings(subpath):
     if request.method == 'OPTIONS':
         return '', 204
-    # Devolve uma resposta padrão para o painel não dar erro.
+    # Devolve uma resposta padrão para qualquer rota de 'settings'
     return jsonify([]), 200
 
-
-# --- NOVA ROTA PARA SALVAR POSTS ---
-@app.route('/api/posts', methods=['POST', 'OPTIONS'])
+# --- ROTA PARA SALVAR POSTS (CORRIGIDA) ---
+# O caminho foi alterado de /api/posts para /api/blog/posts para corresponder ao frontend
+@app.route('/api/blog/posts', methods=['POST', 'OPTIONS'])
 def criar_post():
     if request.method == 'OPTIONS':
         return '', 204
@@ -132,7 +122,6 @@ def criar_post():
 
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
-# Garante que a tabela é criada quando a aplicação arranca
 with app.app_context():
     inicializar_db()
 
