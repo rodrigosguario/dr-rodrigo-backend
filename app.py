@@ -1,31 +1,29 @@
 import os
-import psycopg2 # A nova biblioteca que instalámos
+import psycopg2 # Para a ligação ao banco de dados
 from flask import Flask, request, jsonify
-from flask_cors import CORS # Importar o CORS
+from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Configurar o CORS para permitir pedidos do seu frontend
-# Substitua 'https://seu-site-frontend.onrender.com' pela URL real do seu site
-CORS(app, resources={r"/api/*": {"origins": "*"}}) # Para já, vamos permitir todas as origens para facilitar os testes
+# Configuração de CORS para permitir a comunicação com o seu frontend no Netlify
+CORS(app)
 
-# Função para obter a conexão com o banco de dados
+# --- FUNÇÕES DO BANCO DE DADOS ---
+# Adicionadas para gerir a ligação e criar a tabela de posts
 def get_db_connection():
     try:
-        # A variável DATABASE_URL foi configurada no ambiente do Render
+        # Usa a variável de ambiente que configurámos no Render
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         return conn
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
         return None
 
-# Função para criar a tabela se ela não existir
 def inicializar_db():
     conn = get_db_connection()
     if conn:
-        # 'with' garante que a conexão e o cursor são fechados no final
         with conn.cursor() as cur:
-            # Vamos criar uma tabela simples para guardar posts de um blog
+            # Cria a tabela 'posts' se ela ainda não existir
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
                     id SERIAL PRIMARY KEY,
@@ -43,25 +41,55 @@ def inicializar_db():
 
 # --- ROTAS DA API ---
 
-# Rota de login (a que você já tem)
-@app.route('/api/login', methods=['POST'])
+# Rota principal para verificar se a API está no ar
+@app.route('/')
+def home():
+    return jsonify({"message": "API Backend funcionando!"})
+
+# Rota de verificação de saúde para o Render
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
+# Rota de login (a sua versão que já funcionava)
+@app.route('/api/admin/login', methods=['POST', 'OPTIONS'])
 def login():
-    data = request.get_json()
-    if not data:
-        return jsonify({'message': 'Nenhum dado enviado'}), 400
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json()
+        # Corrigido para 'email' para corresponder ao que o frontend envia
+        email = data.get('email')
+        password = data.get('password')
 
-    email = data.get('email')
-    password = data.get('password')
+        if email == 'admin@example.com' and password == 'admin123':
+            return jsonify({
+                "success": True, 
+                "token": "fake-jwt-token-for-login",
+                "user": { "email": "admin@example.com", "name": "Dr. Rodrigo Sguario" }
+            })
+        else:
+            return jsonify({"success": False, "error": "Credenciais inválidas"}), 401
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
-    # Lembre-se: esta é uma verificação insegura, apenas para demonstração
-    if email == 'admin@example.com' and password == 'admin123':
-        return jsonify({'message': 'Login bem-sucedido'}), 200
-    else:
-        return jsonify({'message': 'Credenciais inválidas'}), 401
+# Rota de verificação de autenticação (a sua versão que já funcionava)
+@app.route('/api/admin/check-auth', methods=['GET', 'OPTIONS'])
+def check_auth():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    return jsonify({
+        "authenticated": True,
+        "user": { "email": "admin@example.com", "name": "Dr. Rodrigo Sguario" }
+    })
 
-# ---- NOVA ROTA PARA SALVAR DADOS ----
-@app.route('/api/posts', methods=['POST'])
+# --- NOVA ROTA PARA SALVAR POSTS ---
+@app.route('/api/posts', methods=['POST', 'OPTIONS'])
 def criar_post():
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     data = request.get_json()
     if not data:
         return jsonify({'message': 'Nenhum dado enviado'}), 400
@@ -86,19 +114,19 @@ def criar_post():
         return jsonify({'message': 'Post salvo com sucesso!'}), 201
     except Exception as e:
         print(f"Erro ao inserir no banco de dados: {e}")
-        conn.rollback() # Desfaz a transação em caso de erro
+        conn.rollback()
         return jsonify({'message': 'Erro ao salvar o post'}), 500
     finally:
         if conn:
             conn.close()
 
-# Executa a inicialização do DB uma vez quando a aplicação arranca
-# Usamos um contexto de aplicação para garantir que tudo está pronto
+
+# --- INICIALIZAÇÃO DO BANCO DE DADOS ---
+# Garante que a tabela é criada quando a aplicação arranca
 with app.app_context():
     inicializar_db()
 
-# Esta parte não é necessária no Render, mas é boa para testes locais
+# Execução da aplicação
 if __name__ == '__main__':
-    # Usar a porta fornecida pelo Render ou 5000 para testes locais
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
