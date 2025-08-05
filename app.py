@@ -21,6 +21,7 @@ def inicializar_db():
     conn = get_db_connection()
     if conn:
         with conn.cursor() as cur:
+            # Tabela de posts (já existente)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
                     id SERIAL PRIMARY KEY,
@@ -29,9 +30,68 @@ def inicializar_db():
                     data_criacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            
+            # Tabela para conteúdo das seções do site
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS site_content (
+                    id SERIAL PRIMARY KEY,
+                    section_id VARCHAR(100) NOT NULL UNIQUE,
+                    section_name VARCHAR(255) NOT NULL,
+                    content_data JSONB NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            # Tabela para configurações do site
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS site_settings (
+                    id SERIAL PRIMARY KEY,
+                    setting_key VARCHAR(100) NOT NULL UNIQUE,
+                    setting_value JSONB NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            # Tabela para avaliações importadas
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id SERIAL PRIMARY KEY,
+                    source VARCHAR(50) NOT NULL,
+                    external_id VARCHAR(255),
+                    author_name VARCHAR(255) NOT NULL,
+                    rating INTEGER NOT NULL,
+                    comment TEXT,
+                    date_created TIMESTAMP WITH TIME ZONE,
+                    imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    is_active BOOLEAN DEFAULT TRUE
+                );
+            """)
+            
+            # Inserir dados padrão para seções do site se não existirem
+            cur.execute("""
+                INSERT INTO site_content (section_id, section_name, content_data) 
+                VALUES 
+                    ('hero', 'Seção Principal', '{"title": "Dr. Rodrigo Sguario", "subtitle": "Cardiologista Especialista em Transplante Cardíaco", "description": "Especialista em cardiologia com foco em transplante cardíaco e insuficiência cardíaca avançada.", "cta_text": "Agendar Consulta"}'),
+                    ('about', 'Sobre o Médico', '{"title": "Sobre o Dr. Rodrigo", "description": "Médico cardiologista com ampla experiência em transplante cardíaco.", "experience": "15+ anos de experiência", "specialties": ["Transplante Cardíaco", "Insuficiência Cardíaca", "Cardiologia Preventiva"]}'),
+                    ('services', 'Serviços', '{"title": "Serviços Oferecidos", "services": [{"name": "Transplante Cardíaco", "description": "Avaliação e acompanhamento para transplante cardíaco"}, {"name": "Insuficiência Cardíaca", "description": "Tratamento especializado para insuficiência cardíaca"}]}'),
+                    ('contact', 'Contato', '{"title": "Entre em Contato", "phone": "(11) 99999-9999", "email": "contato@drrodrigosguario.com.br", "address": "São Paulo, SP"}')
+                ON CONFLICT (section_id) DO NOTHING;
+            """)
+            
+            # Inserir configurações padrão se não existirem
+            cur.execute("""
+                INSERT INTO site_settings (setting_key, setting_value) 
+                VALUES 
+                    ('doctor_info', '{"name": "Dr. Rodrigo Sguario", "specialty": "Cardiologista", "crm": "CRM/SP 123456", "phone": "(11) 99999-9999", "email": "contato@drrodrigosguario.com.br"}'),
+                    ('clinic_info', '{"name": "Clínica Cardiológica", "address": "São Paulo, SP", "phone": "(11) 3333-4444", "hours": "Segunda a Sexta: 8h às 18h"}'),
+                    ('social_media', '{"instagram": "", "facebook": "", "linkedin": "", "whatsapp": "(11) 99999-9999"}'),
+                    ('site_config', '{"theme_color": "#1e293b", "accent_color": "#d4af37", "show_reviews": true, "auto_import_reviews": false}')
+                ON CONFLICT (setting_key) DO NOTHING;
+            """)
+            
             conn.commit()
         conn.close()
-        print("Banco de dados inicializado. Tabela 'posts' verificada/criada.")
+        print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
     else:
         print("Falha na conexão com o DB. A inicialização foi ignorada.")
 
@@ -270,7 +330,272 @@ def deletar_post(post_id):
             conn.close()
 
 
+# --- ROTAS DO SISTEMA CMS ---
+
+# CONTENT MANAGEMENT - Gerenciamento de conteúdo das seções
+@app.route('/api/content', methods=['GET', 'OPTIONS'])
+def get_all_content():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT section_id, section_name, content_data, updated_at 
+                FROM site_content 
+                ORDER BY section_id
+            """)
+            content = cur.fetchall()
+            
+            content_list = []
+            for item in content:
+                content_list.append({
+                    'section_id': item[0],
+                    'section_name': item[1],
+                    'content_data': item[2],
+                    'updated_at': item[3].isoformat() if item[3] else None
+                })
+            
+        return jsonify(content_list), 200
+    except Exception as e:
+        print(f"Erro ao buscar conteúdo: {e}")
+        return jsonify({'message': 'Erro ao carregar conteúdo'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/content/<section_id>', methods=['GET', 'PUT', 'OPTIONS'])
+def manage_section_content(section_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        if request.method == 'GET':
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT section_id, section_name, content_data, updated_at 
+                    FROM site_content 
+                    WHERE section_id = %s
+                """, (section_id,))
+                content = cur.fetchone()
+                
+                if not content:
+                    return jsonify({'message': 'Seção não encontrada'}), 404
+                
+                content_data = {
+                    'section_id': content[0],
+                    'section_name': content[1],
+                    'content_data': content[2],
+                    'updated_at': content[3].isoformat() if content[3] else None
+                }
+                
+            return jsonify(content_data), 200
+            
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data or 'content_data' not in data:
+                return jsonify({'message': 'Dados de conteúdo são obrigatórios'}), 400
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE site_content 
+                    SET content_data = %s, updated_at = CURRENT_TIMESTAMP 
+                    WHERE section_id = %s
+                """, (json.dumps(data['content_data']), section_id))
+                
+                if cur.rowcount == 0:
+                    return jsonify({'message': 'Seção não encontrada'}), 404
+                
+                conn.commit()
+                
+            return jsonify({'message': 'Conteúdo atualizado com sucesso!'}), 200
+            
+    except Exception as e:
+        print(f"Erro ao gerenciar conteúdo: {e}")
+        conn.rollback()
+        return jsonify({'message': 'Erro ao processar conteúdo'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# SETTINGS MANAGEMENT - Gerenciamento de configurações
+@app.route('/api/settings', methods=['GET', 'OPTIONS'])
+def get_all_settings():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT setting_key, setting_value, updated_at 
+                FROM site_settings 
+                ORDER BY setting_key
+            """)
+            settings = cur.fetchall()
+            
+            settings_dict = {}
+            for setting in settings:
+                settings_dict[setting[0]] = {
+                    'value': setting[1],
+                    'updated_at': setting[2].isoformat() if setting[2] else None
+                }
+            
+        return jsonify(settings_dict), 200
+    except Exception as e:
+        print(f"Erro ao buscar configurações: {e}")
+        return jsonify({'message': 'Erro ao carregar configurações'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/settings/<setting_key>', methods=['GET', 'PUT', 'OPTIONS'])
+def manage_setting(setting_key):
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        if request.method == 'GET':
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT setting_value, updated_at 
+                    FROM site_settings 
+                    WHERE setting_key = %s
+                """, (setting_key,))
+                setting = cur.fetchone()
+                
+                if not setting:
+                    return jsonify({'message': 'Configuração não encontrada'}), 404
+                
+                setting_data = {
+                    'key': setting_key,
+                    'value': setting[0],
+                    'updated_at': setting[1].isoformat() if setting[1] else None
+                }
+                
+            return jsonify(setting_data), 200
+            
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data or 'value' not in data:
+                return jsonify({'message': 'Valor da configuração é obrigatório'}), 400
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE site_settings 
+                    SET setting_value = %s, updated_at = CURRENT_TIMESTAMP 
+                    WHERE setting_key = %s
+                """, (json.dumps(data['value']), setting_key))
+                
+                if cur.rowcount == 0:
+                    return jsonify({'message': 'Configuração não encontrada'}), 404
+                
+                conn.commit()
+                
+            return jsonify({'message': 'Configuração atualizada com sucesso!'}), 200
+            
+    except Exception as e:
+        print(f"Erro ao gerenciar configuração: {e}")
+        conn.rollback()
+        return jsonify({'message': 'Erro ao processar configuração'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# REVIEWS MANAGEMENT - Gerenciamento de avaliações
+@app.route('/api/reviews', methods=['GET', 'POST', 'OPTIONS'])
+def manage_reviews():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        if request.method == 'GET':
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, source, author_name, rating, comment, date_created, is_active 
+                    FROM reviews 
+                    WHERE is_active = TRUE 
+                    ORDER BY date_created DESC
+                """)
+                reviews = cur.fetchall()
+                
+                reviews_list = []
+                for review in reviews:
+                    reviews_list.append({
+                        'id': review[0],
+                        'source': review[1],
+                        'author_name': review[2],
+                        'rating': review[3],
+                        'comment': review[4],
+                        'date_created': review[5].isoformat() if review[5] else None,
+                        'is_active': review[6]
+                    })
+                
+            return jsonify(reviews_list), 200
+            
+        elif request.method == 'POST':
+            data = request.get_json()
+            required_fields = ['source', 'author_name', 'rating']
+            
+            if not data or not all(field in data for field in required_fields):
+                return jsonify({'message': 'Campos obrigatórios: source, author_name, rating'}), 400
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO reviews (source, external_id, author_name, rating, comment, date_created) 
+                    VALUES (%s, %s, %s, %s, %s, %s) 
+                    RETURNING id
+                """, (
+                    data['source'],
+                    data.get('external_id'),
+                    data['author_name'],
+                    data['rating'],
+                    data.get('comment'),
+                    data.get('date_created')
+                ))
+                review_id = cur.fetchone()[0]
+                conn.commit()
+                
+            return jsonify({'message': 'Avaliação adicionada com sucesso!', 'id': review_id}), 201
+            
+    except Exception as e:
+        print(f"Erro ao gerenciar avaliações: {e}")
+        conn.rollback()
+        return jsonify({'message': 'Erro ao processar avaliações'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/reviews/import', methods=['POST', 'OPTIONS'])
+def import_reviews():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    # Esta rota será implementada para importar avaliações do Doctoralia e Google
+    return jsonify({'message': 'Funcionalidade de importação será implementada'}), 200
+
+
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
+import json
 with app.app_context():
     inicializar_db()
 
