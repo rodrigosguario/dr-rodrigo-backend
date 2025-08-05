@@ -1,7 +1,10 @@
 import os
-import psycopg2 # Para a ligação ao banco de dados
+import sqlite3
+import psycopg2
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from datetime import datetime
+from scraper_reviews import import_all_reviews, ReviewsScraper
 
 app = Flask(__name__)
 
@@ -590,8 +593,62 @@ def import_reviews():
     if request.method == 'OPTIONS':
         return '', 204
     
-    # Esta rota será implementada para importar avaliações do Doctoralia e Google
-    return jsonify({'message': 'Funcionalidade de importação será implementada'}), 200
+    data = request.get_json()
+    source = data.get('source', 'all') if data else 'all'
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        scraper = ReviewsScraper()
+        results = {
+            "success": False,
+            "imported": 0,
+            "message": "",
+            "details": {}
+        }
+        
+        if source == 'doctoralia' or source == 'all':
+            # Importar do Doctoralia
+            doctoralia_result = scraper.scrape_doctoralia_reviews()
+            if doctoralia_result["success"]:
+                import_result = scraper.import_reviews_to_database(
+                    doctoralia_result["reviews"], 
+                    conn
+                )
+                results["details"]["doctoralia"] = import_result
+                results["imported"] += import_result.get("imported", 0)
+        
+        if source == 'google' or source == 'all':
+            # Importar do Google
+            google_result = scraper.scrape_google_reviews()
+            if google_result["success"]:
+                import_result = scraper.import_reviews_to_database(
+                    google_result["reviews"], 
+                    conn
+                )
+                results["details"]["google"] = import_result
+                results["imported"] += import_result.get("imported", 0)
+        
+        if results["imported"] > 0:
+            results["success"] = True
+            results["message"] = f"{results['imported']} novas avaliações importadas com sucesso!"
+        else:
+            results["message"] = "Nenhuma nova avaliação encontrada para importar."
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Erro ao importar avaliações: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao importar avaliações: {str(e)}',
+            'imported': 0
+        }), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
