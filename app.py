@@ -14,7 +14,13 @@ CORS(app)
 # --- FUNÇÕES DO BANCO DE DADOS ---
 def get_db_connection():
     try:
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        # Verificar se a variável de ambiente existe
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            print("DATABASE_URL não configurada")
+            return None
+        
+        conn = psycopg2.connect(database_url)
         return conn
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
@@ -23,7 +29,8 @@ def get_db_connection():
 def inicializar_db():
     conn = get_db_connection()
     if conn:
-        with conn.cursor() as cur:
+        try:
+            with conn.cursor() as cur:
             # Tabela de posts (já existente)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
@@ -180,8 +187,12 @@ def inicializar_db():
                 """, (setting_key, json.dumps(setting_value)))
             
             conn.commit()
-        conn.close()
-        print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
+            conn.close()
+            print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
+        except Exception as e:
+            print(f"Erro ao inicializar banco de dados: {e}")
+            if conn:
+                conn.close()
     else:
         print("Falha na conexão com o DB. A inicialização foi ignorada.")
 
