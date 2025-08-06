@@ -953,7 +953,11 @@ def wordpress_create_backup():
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
 with app.app_context():
-    inicializar_db()
+    try:
+        inicializar_db()
+    except Exception as e:
+        print(f"Erro na inicialização do banco: {e}")
+        # Continua mesmo se falhar
 
 # Execução da aplicação
 if __name__ == '__main__':
