@@ -31,54 +31,54 @@ def inicializar_db():
     if conn:
         try:
             with conn.cursor() as cur:
-            # Tabela de posts (já existente)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS posts (
-                    id SERIAL PRIMARY KEY,
-                    titulo VARCHAR(255) NOT NULL,
-                    conteudo TEXT NOT NULL,
-                    data_criacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
+                # Tabela de posts (já existente)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS posts (
+                        id SERIAL PRIMARY KEY,
+                        titulo VARCHAR(255) NOT NULL,
+                        conteudo TEXT NOT NULL,
+                        data_criacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
             
-            # Tabela para conteúdo das seções do site
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS site_content (
-                    id SERIAL PRIMARY KEY,
-                    section_id VARCHAR(100) NOT NULL UNIQUE,
-                    section_name VARCHAR(255) NOT NULL,
-                    content_data JSONB NOT NULL,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
+                # Tabela para conteúdo das seções do site
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS site_content (
+                        id SERIAL PRIMARY KEY,
+                        section_id VARCHAR(100) NOT NULL UNIQUE,
+                        section_name VARCHAR(255) NOT NULL,
+                        content_data JSONB NOT NULL,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # Tabela para configurações do site
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS site_settings (
+                        id SERIAL PRIMARY KEY,
+                        setting_key VARCHAR(100) NOT NULL UNIQUE,
+                        setting_value JSONB NOT NULL,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # Tabela para avaliações importadas
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS reviews (
+                        id SERIAL PRIMARY KEY,
+                        source VARCHAR(50) NOT NULL,
+                        external_id VARCHAR(255),
+                        author_name VARCHAR(255) NOT NULL,
+                        rating INTEGER NOT NULL,
+                        comment TEXT,
+                        date_created TIMESTAMP WITH TIME ZONE,
+                        imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        is_active BOOLEAN DEFAULT TRUE
+                    );
+                """)
             
-            # Tabela para configurações do site
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS site_settings (
-                    id SERIAL PRIMARY KEY,
-                    setting_key VARCHAR(100) NOT NULL UNIQUE,
-                    setting_value JSONB NOT NULL,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            
-            # Tabela para avaliações importadas
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS reviews (
-                    id SERIAL PRIMARY KEY,
-                    source VARCHAR(50) NOT NULL,
-                    external_id VARCHAR(255),
-                    author_name VARCHAR(255) NOT NULL,
-                    rating INTEGER NOT NULL,
-                    comment TEXT,
-                    date_created TIMESTAMP WITH TIME ZONE,
-                    imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                );
-            """)
-            
-            # Inserir dados padrão COMPLETOS para todas as seções do site
-            default_content = [
+                # Inserir dados padrão COMPLETOS para todas as seções do site
+                default_content = [
                 ('hero', 'Seção Principal', {
                     "title": "Dr. Rodrigo Sguario",
                     "subtitle": "Cardiologista Especialista em Transplante Cardíaco",
@@ -150,8 +150,8 @@ def inicializar_db():
                     ON CONFLICT (section_id) DO NOTHING;
                 """, (section_id, section_name, json.dumps(content_data)))
             
-            # Inserir configurações padrão
-            default_settings = [
+                # Inserir configurações padrão
+                default_settings = [
                 ('doctor_info', {
                     "name": "Dr. Rodrigo Sguario",
                     "specialty": "Cardiologista",
@@ -179,16 +179,16 @@ def inicializar_db():
                 })
             ]
             
-            for setting_key, setting_value in default_settings:
-                cur.execute("""
-                    INSERT INTO site_settings (setting_key, setting_value) 
-                    VALUES (%s, %s)
-                    ON CONFLICT (setting_key) DO NOTHING;
-                """, (setting_key, json.dumps(setting_value)))
-            
-            conn.commit()
-            conn.close()
-            print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
+                for setting_key, setting_value in default_settings:
+                    cur.execute("""
+                        INSERT INTO site_settings (setting_key, setting_value) 
+                        VALUES (%s, %s)
+                        ON CONFLICT (setting_key) DO NOTHING;
+                    """, (setting_key, json.dumps(setting_value)))
+                
+                conn.commit()
+                conn.close()
+                print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
         except Exception as e:
             print(f"Erro ao inicializar banco de dados: {e}")
             if conn:

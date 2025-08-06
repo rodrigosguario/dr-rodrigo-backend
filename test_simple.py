@@ -1,0 +1,1 @@
+import requests; print("Testando API..."); response = requests.get("https://dr-rodrigo-backend-o.onrender.com/health", timeout=10); print(f"Status: {response.status_code}"); print(f"Resposta: {response.text}")
