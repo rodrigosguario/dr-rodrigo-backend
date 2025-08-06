@@ -217,6 +217,20 @@ def test_api():
         "cors": "Configurado para sitecardiologia.netlify.app"
     })
 
+@app.route('/api/init-db')
+def init_database():
+    try:
+        inicializar_db()
+        return jsonify({
+            "status": "success",
+            "message": "Banco de dados inicializado com sucesso"
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Erro ao inicializar banco: {str(e)}"
+        }), 500
+
 @app.route('/api/admin/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
@@ -963,12 +977,7 @@ def wordpress_create_backup():
             conn.close()
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
-with app.app_context():
-    try:
-        inicializar_db()
-    except Exception as e:
-        print(f"Erro na inicialização do banco: {e}")
-        # Continua mesmo se falhar
+# A inicialização será feita apenas quando necessário, não durante o import
 
 # Execução da aplicação
 if __name__ == '__main__':
