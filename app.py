@@ -9,7 +9,9 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 # Configuração de CORS para permitir a comunicação com o seu frontend no Netlify
-CORS(app)
+CORS(app, origins=['https://sitecardiologia.netlify.app', 'http://localhost:5173', 'http://localhost:3000'], 
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'])
 
 # --- FUNÇÕES DO BANCO DE DADOS ---
 def get_db_connection():
@@ -205,6 +207,15 @@ def home():
 @app.route('/health')
 def health_check():
     return jsonify({"status": "healthy"}), 200
+
+@app.route('/api/test')
+def test_api():
+    return jsonify({
+        "status": "success", 
+        "message": "API funcionando corretamente",
+        "timestamp": datetime.now().isoformat(),
+        "cors": "Configurado para sitecardiologia.netlify.app"
+    })
 
 @app.route('/api/admin/login', methods=['POST', 'OPTIONS'])
 def login():
