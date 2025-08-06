@@ -1,10 +1,10 @@
 import os
-import sqlite3
-import psycopg2
+import json
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime
-from scraper_reviews import import_all_reviews, ReviewsScraper
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 
@@ -70,34 +70,120 @@ def inicializar_db():
                 );
             """)
             
-            # Inserir dados padrão para seções do site se não existirem
-            cur.execute("""
-                INSERT INTO site_content (section_id, section_name, content_data) 
-                VALUES 
-                    ('hero', 'Seção Principal', '{"title": "Dr. Rodrigo Sguario", "subtitle": "Cardiologista Especialista em Transplante Cardíaco", "description": "Especialista em cardiologia com foco em transplante cardíaco e insuficiência cardíaca avançada.", "cta_text": "Agendar Consulta"}'),
-                    ('about', 'Sobre o Médico', '{"title": "Sobre o Dr. Rodrigo", "description": "Médico cardiologista com ampla experiência em transplante cardíaco.", "experience": "15+ anos de experiência", "specialties": ["Transplante Cardíaco", "Insuficiência Cardíaca", "Cardiologia Preventiva"]}'),
-                    ('services', 'Serviços', '{"title": "Serviços Oferecidos", "services": [{"name": "Transplante Cardíaco", "description": "Avaliação e acompanhamento para transplante cardíaco"}, {"name": "Insuficiência Cardíaca", "description": "Tratamento especializado para insuficiência cardíaca"}]}'),
-                    ('contact', 'Contato', '{"title": "Entre em Contato", "phone": "(11) 99999-9999", "email": "contato@drrodrigosguario.com.br", "address": "São Paulo, SP"}')
-                ON CONFLICT (section_id) DO NOTHING;
-            """)
+            # Inserir dados padrão COMPLETOS para todas as seções do site
+            default_content = [
+                ('hero', 'Seção Principal', {
+                    "title": "Dr. Rodrigo Sguario",
+                    "subtitle": "Cardiologista Especialista em Transplante Cardíaco",
+                    "description": "Especialista em cardiologia com foco em transplante cardíaco e insuficiência cardíaca avançada.",
+                    "cta_text": "Agendar Consulta",
+                    "cta_link": "#contact",
+                    "achievements": [
+                        {"icon": "Heart", "title": "Referência em Transplante", "description": "Liderança e experiência em transplantes cardíacos"},
+                        {"icon": "Award", "title": "Tecnologia Avançada", "description": "Equipamentos de última geração para diagnósticos precisos"},
+                        {"icon": "Users", "title": "Atendimento Humanizado", "description": "Cuidado focado no paciente, com empatia e atenção"}
+                    ],
+                    "stats": [
+                        {"number": "500+", "label": "Pacientes Atendidos"},
+                        {"number": "15+", "label": "Anos de Experiência"},
+                        {"number": "5.0", "label": "Avaliação Média", "icon": "Star"},
+                        {"number": "24h", "label": "Suporte Emergencial"}
+                    ]
+                }),
+                ('about', 'Sobre o Médico', {
+                    "title": "Sobre o Dr. Rodrigo",
+                    "description": "Médico cardiologista com ampla experiência em transplante cardíaco e cuidado humanizado.",
+                    "education": [
+                        {"institution": "Instituto do Coração (InCor) - USP-SP", "degree": "Especialização em Insuficiência Cardíaca e Transplante", "period": "2023-2024", "description": "Centro de referência em cardiologia da América Latina"},
+                        {"institution": "UNICAMP", "degree": "Residência em Cardiologia", "period": "2021-2023", "description": "Formação especializada em cardiologia clínica e intervencionista"},
+                        {"institution": "Universidade Federal de Pelotas (UFPel)", "degree": "Graduação em Medicina", "period": "2015-2020", "description": "Formação médica com foco humanizado"}
+                    ],
+                    "specialties": [
+                        "Transplante Cardíaco",
+                        "Insuficiência Cardíaca Avançada", 
+                        "Cardiologia Preventiva",
+                        "Ecocardiografia",
+                        "Cateterismo Cardíaco",
+                        "Reabilitação Cardíaca"
+                    ],
+                    "values": [
+                        {"icon": "Heart", "title": "Formação de Excelência", "description": "InCor-USP, UNICAMP e UFPel. Formação acadêmica completa."},
+                        {"icon": "Users", "title": "Foco no Paciente", "description": "Cuidado centrado nas necessidades individuais de cada paciente."},
+                        {"icon": "BookOpen", "title": "Atualização Constante", "description": "Sempre em busca das mais recentes inovações em cardiologia."}
+                    ]
+                }),
+                ('services', 'Serviços', {
+                    "title": "Serviços Oferecidos",
+                    "description": "Cuidado cardiológico completo e personalizado para cada paciente.",
+                    "services": [
+                        {"name": "Transplante Cardíaco", "description": "Avaliação, indicação e acompanhamento para transplante cardíaco", "icon": "Heart"},
+                        {"name": "Insuficiência Cardíaca", "description": "Tratamento especializado para insuficiência cardíaca avançada", "icon": "Activity"},
+                        {"name": "Cardiologia Preventiva", "description": "Prevenção e controle de fatores de risco cardiovascular", "icon": "Shield"},
+                        {"name": "Ecocardiografia", "description": "Exames de imagem cardíaca com tecnologia avançada", "icon": "Monitor"},
+                        {"name": "Cateterismo Cardíaco", "description": "Procedimentos diagnósticos e terapêuticos invasivos", "icon": "Zap"},
+                        {"name": "Reabilitação Cardíaca", "description": "Programa de recuperação e prevenção secundária", "icon": "TrendingUp"}
+                    ]
+                }),
+                ('contact', 'Contato', {
+                    "title": "Entre em Contato",
+                    "description": "Agende sua consulta ou entre em contato conosco",
+                    "phone": "(11) 99999-9999",
+                    "email": "contato@drrodrigosguario.com.br",
+                    "address": "São Paulo, SP",
+                    "hours": "Segunda a Sexta: 8h às 18h",
+                    "emergency": "24h para casos de emergência"
+                })
+            ]
             
-            # Inserir configurações padrão se não existirem
-            cur.execute("""
-                INSERT INTO site_settings (setting_key, setting_value) 
-                VALUES 
-                    ('doctor_info', '{"name": "Dr. Rodrigo Sguario", "specialty": "Cardiologista", "crm": "CRM/SP 123456", "phone": "(11) 99999-9999", "email": "contato@drrodrigosguario.com.br"}'),
-                    ('clinic_info', '{"name": "Clínica Cardiológica", "address": "São Paulo, SP", "phone": "(11) 3333-4444", "hours": "Segunda a Sexta: 8h às 18h"}'),
-                    ('social_media', '{"instagram": "", "facebook": "", "linkedin": "", "whatsapp": "(11) 99999-9999"}'),
-                    ('site_config', '{"theme_color": "#1e293b", "accent_color": "#d4af37", "show_reviews": true, "auto_import_reviews": false}')
-                ON CONFLICT (setting_key) DO NOTHING;
-            """)
+            # Inserir conteúdo padrão
+            for section_id, section_name, content_data in default_content:
+                cur.execute("""
+                    INSERT INTO site_content (section_id, section_name, content_data) 
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (section_id) DO NOTHING;
+                """, (section_id, section_name, json.dumps(content_data)))
+            
+            # Inserir configurações padrão
+            default_settings = [
+                ('doctor_info', {
+                    "name": "Dr. Rodrigo Sguario",
+                    "specialty": "Cardiologista",
+                    "crm": "CRM/SP 123456",
+                    "phone": "(11) 99999-9999",
+                    "email": "contato@drrodrigosguario.com.br"
+                }),
+                ('clinic_info', {
+                    "name": "Clínica Cardiológica",
+                    "address": "São Paulo, SP",
+                    "phone": "(11) 3333-4444",
+                    "hours": "Segunda a Sexta: 8h às 18h"
+                }),
+                ('social_media', {
+                    "instagram": "",
+                    "facebook": "",
+                    "linkedin": "",
+                    "whatsapp": "(11) 99999-9999"
+                }),
+                ('site_config', {
+                    "theme_color": "#1e293b",
+                    "accent_color": "#d4af37",
+                    "show_reviews": True,
+                    "auto_import_reviews": False
+                })
+            ]
+            
+            for setting_key, setting_value in default_settings:
+                cur.execute("""
+                    INSERT INTO site_settings (setting_key, setting_value) 
+                    VALUES (%s, %s)
+                    ON CONFLICT (setting_key) DO NOTHING;
+                """, (setting_key, json.dumps(setting_value)))
             
             conn.commit()
         conn.close()
         print("Banco de dados inicializado. Todas as tabelas do CMS verificadas/criadas.")
     else:
         print("Falha na conexão com o DB. A inicialização foi ignorada.")
-
 
 # --- ROTAS DA API ---
 
@@ -140,7 +226,7 @@ def check_auth():
 
 # --- ROTAS ADICIONADAS PARA EVITAR ERROS 404 ---
 @app.route('/api/settings/<path:subpath>', methods=['GET', 'OPTIONS'])
-def get_settings(subpath):
+def get_settings_fallback(subpath):
     if request.method == 'OPTIONS':
         return '', 204
     # Devolve uma resposta padrão para qualquer rota de 'settings'
@@ -331,7 +417,6 @@ def deletar_post(post_id):
     finally:
         if conn:
             conn.close()
-
 
 # --- ROTAS DO SISTEMA CMS ---
 
@@ -704,9 +789,158 @@ def import_reviews():
         if conn:
             conn.close()
 
+# --- ROTAS ADICIONAIS PARA WORDPRESS CMS ---
+
+@app.route('/api/site/content', methods=['GET', 'POST', 'OPTIONS'])
+def wordpress_site_content():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        if request.method == 'GET':
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT section_id, content_data 
+                    FROM site_content 
+                    ORDER BY section_id
+                """)
+                content = cur.fetchall()
+                
+                content_dict = {}
+                for item in content:
+                    content_dict[item[0]] = item[1]
+                
+            return jsonify(content_dict), 200
+            
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return jsonify({'message': 'Nenhum dado enviado'}), 400
+            
+            with conn.cursor() as cur:
+                for section_id, content_data in data.items():
+                    cur.execute("""
+                        INSERT INTO site_content (section_id, section_name, content_data) 
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (section_id) 
+                        DO UPDATE SET content_data = %s, updated_at = CURRENT_TIMESTAMP
+                    """, (
+                        section_id, 
+                        section_id.replace('_', ' ').title(), 
+                        json.dumps(content_data),
+                        json.dumps(content_data)
+                    ))
+                
+                conn.commit()
+                
+            return jsonify({'message': 'Conteúdo do site atualizado com sucesso!'}), 200
+            
+    except Exception as e:
+        print(f"Erro ao gerenciar conteúdo do site: {e}")
+        conn.rollback()
+        return jsonify({'message': 'Erro ao processar conteúdo do site'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/site/content/<section_id>', methods=['PUT', 'OPTIONS'])
+def wordpress_update_section(section_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.get_json()
+    if not data or 'content_data' not in data:
+        return jsonify({'message': 'Dados de conteúdo são obrigatórios'}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO site_content (section_id, section_name, content_data) 
+                VALUES (%s, %s, %s)
+                ON CONFLICT (section_id) 
+                DO UPDATE SET content_data = %s, updated_at = CURRENT_TIMESTAMP
+            """, (
+                section_id,
+                section_id.replace('_', ' ').title(),
+                json.dumps(data['content_data']),
+                json.dumps(data['content_data'])
+            ))
+            
+            conn.commit()
+            
+        return jsonify({'message': 'Seção atualizada com sucesso!'}), 200
+        
+    except Exception as e:
+        print(f"Erro ao atualizar seção: {e}")
+        conn.rollback()
+        return jsonify({'message': 'Erro ao atualizar seção'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/site/backup', methods=['POST', 'OPTIONS'])
+def wordpress_create_backup():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Erro de conexão com o banco de dados'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            # Backup do conteúdo
+            cur.execute("SELECT section_id, content_data FROM site_content")
+            content_backup = cur.fetchall()
+            
+            # Backup das configurações
+            cur.execute("SELECT setting_key, setting_value FROM site_settings")
+            settings_backup = cur.fetchall()
+            
+            # Backup dos posts
+            cur.execute("SELECT id, titulo, conteudo, data_criacao FROM posts")
+            posts_backup = cur.fetchall()
+            
+            backup_data = {
+                'timestamp': datetime.now().isoformat(),
+                'content': {item[0]: item[1] for item in content_backup},
+                'settings': {item[0]: item[1] for item in settings_backup},
+                'posts': [
+                    {
+                        'id': item[0],
+                        'titulo': item[1],
+                        'conteudo': item[2],
+                        'data_criacao': item[3].isoformat() if item[3] else None
+                    }
+                    for item in posts_backup
+                ]
+            }
+            
+        return jsonify({
+            'success': True,
+            'message': 'Backup criado com sucesso!',
+            'backup': backup_data
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao criar backup: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao criar backup: {str(e)}'
+        }), 500
+    finally:
+        if conn:
+            conn.close()
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
-import json
 with app.app_context():
     inicializar_db()
 
